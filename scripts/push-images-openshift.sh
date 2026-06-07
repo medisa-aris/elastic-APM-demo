@@ -84,6 +84,17 @@ for name in "${IMAGES[@]}"; do
 done
 ok "All local images found in Docker"
 
+# ── Ensure namespace exists ───────────────────────────────────────────────────
+step "Ensuring namespace '$NAMESPACE' exists"
+
+if oc get namespace "$NAMESPACE" &>/dev/null; then
+  ok "Namespace already exists"
+else
+  oc new-project "$NAMESPACE" --display-name="Elastic APM Demo" || \
+    oc create namespace "$NAMESPACE"
+  ok "Namespace created"
+fi
+
 # ── Registry route ────────────────────────────────────────────────────────────
 step "Getting OpenShift internal registry route"
 
