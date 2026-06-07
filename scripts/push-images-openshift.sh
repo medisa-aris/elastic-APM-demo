@@ -3,10 +3,10 @@
 #
 # Supports CRC (OpenShift Local) where the registry uses a self-signed cert.
 # Runtime selection order (first available wins):
-#   1. skopeo  — reads from Docker daemon, --dest-tls-verify=false (best for CRC)
-#   2. podman  — --tls-verify=false
-#   3. docker  — only works when the registry has a trusted cert
-#                (for CRC: run setup-docker-insecure-registry.sh first)
+#   1. buildah — native RHEL/CRC tool, --tls-verify=false, no daemon restart
+#   2. skopeo  — reads from Docker daemon, --dest-tls-verify=false
+#   3. podman  — --tls-verify=false
+#   4. docker  — requires insecure-registry config for CRC self-signed certs
 #
 # Usage:
 #   ./scripts/push-images-openshift.sh [--namespace <ns>]
@@ -55,24 +55,25 @@ fi
 OC_USER=$(oc whoami 2>/dev/null) || { fail "Not logged in. Run: oc login <cluster-url>"; exit 1; }
 ok "Logged in as: $OC_USER"
 
-# Runtime selection: skopeo > podman > docker
-# skopeo is the best choice for CRC because it reads directly from the Docker
-# daemon and supports --dest-tls-verify=false without any daemon configuration.
-if command -v skopeo &>/dev/null; then
+# Runtime selection: buildah > skopeo > podman > docker
+# buildah and skopeo support --tls-verify=false without daemon config changes.
+if command -v buildah &>/dev/null; then
+  RUNTIME="buildah"
+elif command -v skopeo &>/dev/null; then
   RUNTIME="skopeo"
 elif command -v podman &>/dev/null; then
   RUNTIME="podman"
 elif command -v docker &>/dev/null; then
   RUNTIME="docker"
 else
-  fail "No container runtime found (need skopeo, podman, or docker)."
+  fail "No container runtime found (need buildah, skopeo, podman, or docker)."
   exit 1
 fi
 ok "Container runtime: $RUNTIME"
 
 # Verify local images exist in Docker daemon
 if ! command -v docker &>/dev/null; then
-  fail "docker is required to read local images (even when pushing with skopeo/podman)."
+  fail "docker is required to read local images even when pushing with buildah/skopeo/podman."
   exit 1
 fi
 for name in "${IMAGES[@]}"; do
@@ -94,6 +95,16 @@ else
     oc create namespace "$NAMESPACE"
   ok "Namespace created"
 fi
+
+# ── Pre-create ImageStreams ───────────────────────────────────────────────────
+# The registry returns 500 if it can't create/resolve the ImageStream on-the-fly
+# during a push. Pre-creating them ensures the push has somewhere to land.
+step "Pre-creating ImageStreams in '$NAMESPACE'"
+for name in "${IMAGES[@]}"; do
+  oc create imagestream "$name" -n "$NAMESPACE" 2>/dev/null && \
+    echo "    Created: $name" || \
+    echo "    Exists:  $name"
+done
 
 # ── Registry route ────────────────────────────────────────────────────────────
 step "Getting OpenShift internal registry route"
@@ -125,38 +136,35 @@ ok "Registry: $REGISTRY"
 
 OC_TOKEN=$(oc whoami -t)
 
-# Detect CRC (self-signed cert) and warn if using docker
+# Detect CRC (self-signed cert)
 IS_CRC=false
 [[ "$REGISTRY" =~ \.apps-crc\.testing$ ]] && IS_CRC=true
 
-if [[ "$RUNTIME" == "docker" ]] && $IS_CRC; then
-  warn "CRC detected but only docker is available."
-  warn "docker push will fail with x509 TLS errors unless the registry is"
-  warn "added to insecure-registries. Run this to fix it:"
-  warn ""
-  warn "  sudo bash $SCRIPT_DIR/setup-docker-insecure-registry.sh $REGISTRY"
-  warn ""
-  warn "Then re-run this script. Or install skopeo for a zero-config alternative:"
-  warn "  sudo dnf install -y skopeo   # RHEL/Fedora/CentOS"
-  warn "  sudo apt install -y skopeo   # Debian/Ubuntu"
-  warn ""
-  warn "Attempting push anyway — it may succeed if you already configured Docker."
-fi
-
-# ── RBAC: grant registry-editor to the current user in the namespace ──────────
-# Even cluster-admin users need this role explicitly for Docker push to succeed.
+# ── RBAC ──────────────────────────────────────────────────────────────────────
 step "Granting registry push permissions in '$NAMESPACE'"
 oc policy add-role-to-user registry-editor "$OC_USER" -n "$NAMESPACE" 2>/dev/null && \
   ok "registry-editor role granted to $OC_USER" || \
-  warn "Could not grant registry-editor (may already be set or insufficient perms)"
+  warn "Could not grant registry-editor (may already be set)"
 
-# ── Login (not needed for skopeo — it uses --dest-creds inline) ──────────────
-if [[ "$RUNTIME" != "skopeo" ]]; then
+# Refresh token after role grant
+OC_TOKEN=$(oc whoami -t)
+
+# ── Verify registry pod is healthy ────────────────────────────────────────────
+step "Checking registry pod health"
+REG_PODS=$(oc get pods -n openshift-image-registry \
+  -l docker-registry=default --field-selector=status.phase=Running \
+  -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
+if [[ -z "$REG_PODS" ]]; then
+  warn "No running registry pod found — checking all pods:"
+  oc get pods -n openshift-image-registry 2>/dev/null || true
+  fail "Registry pod is not running. Check: oc logs -n openshift-image-registry deployment/image-registry"
+  exit 1
+fi
+ok "Registry pod(s) running: $REG_PODS"
+
+# ── Login ─────────────────────────────────────────────────────────────────────
+if [[ "$RUNTIME" != "skopeo" && "$RUNTIME" != "buildah" ]]; then
   step "Logging in to registry"
-
-  # Refresh the token after the role grant
-  OC_TOKEN=$(oc whoami -t)
-
   if [[ "$RUNTIME" == "podman" ]]; then
     podman login --tls-verify=false -u "$OC_USER" -p "$OC_TOKEN" "$REGISTRY"
   else
@@ -168,17 +176,25 @@ fi
 # ── Push ──────────────────────────────────────────────────────────────────────
 step "Pushing images to $REGISTRY/$NAMESPACE"
 
+PUSH_FAILED=false
 for name in "${IMAGES[@]}"; do
   DEST="${REGISTRY}/${NAMESPACE}/${name}:latest"
   printf "    %-42s" "${name}:local → latest"
 
   case "$RUNTIME" in
+    buildah)
+      # buildah reads from Docker daemon via containers-storage or docker-daemon transport
+      buildah push --tls-verify=false \
+        --creds="${OC_USER}:${OC_TOKEN}" \
+        "docker-daemon:${name}:local" \
+        "docker://${DEST}" 2>&1 | tail -1
+      ;;
     skopeo)
       skopeo copy \
         --dest-creds="${OC_USER}:${OC_TOKEN}" \
         --dest-tls-verify=false \
         "docker-daemon:${name}:local" \
-        "docker://${DEST}"
+        "docker://${DEST}" 2>&1 | tail -1
       ;;
     podman)
       podman tag "${name}:local" "$DEST"
@@ -190,8 +206,23 @@ for name in "${IMAGES[@]}"; do
       ;;
   esac
 
-  echo -e " ${GREEN}done${NC}"
+  if [[ $? -eq 0 ]]; then
+    echo -e " ${GREEN}done${NC}"
+  else
+    echo -e " ${RED}FAILED${NC}"
+    PUSH_FAILED=true
+  fi
 done
+
+if $PUSH_FAILED; then
+  echo ""
+  warn "One or more pushes failed. Showing last 20 lines of registry logs:"
+  oc logs -n openshift-image-registry deployment/image-registry --tail=20 2>/dev/null || \
+    oc logs -n openshift-image-registry -l docker-registry=default --tail=20 2>/dev/null || true
+  echo ""
+  fail "Push failed. Fix the errors above and retry."
+  exit 1
+fi
 
 echo ""
 ok "All images pushed. OpenShift pods can now pull them."
