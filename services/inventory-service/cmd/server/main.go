@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/demo/inventory-service/cmd/server/db"
@@ -25,6 +26,9 @@ func initTracer(ctx context.Context) (func(context.Context) error, error) {
 	if endpoint == "" {
 		endpoint = "localhost:4317"
 	}
+	// grpc.NewClient expects host:port with no URL scheme
+	endpoint = strings.TrimPrefix(endpoint, "https://")
+	endpoint = strings.TrimPrefix(endpoint, "http://")
 
 	conn, err := grpc.NewClient(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
