@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: demo-frontend:local
-          imagePullPolicy: Never
+          image: image-registry.openshift-image-registry.svc:5000/elastic-apm-demo/demo-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
           env:

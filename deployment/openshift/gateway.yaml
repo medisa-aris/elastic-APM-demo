@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: demo-gateway:local
-          imagePullPolicy: Never
+          image: image-registry.openshift-image-registry.svc:5000/elastic-apm-demo/demo-gateway:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 4000
           envFrom:

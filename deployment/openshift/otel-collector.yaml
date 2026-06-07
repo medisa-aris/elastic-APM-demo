@@ -18,7 +18,7 @@ data:
       resource:
         attributes:
           - key: deployment.environment
-            value: kubernetes
+            value: openshift
             action: upsert
     exporters:
       otlp/elastic:

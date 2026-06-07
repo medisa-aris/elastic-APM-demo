@@ -196,8 +196,41 @@ case "$MODE" in
     ;;
 
   openshift)
-    step "Building Docker images for OpenShift (imagePullPolicy: Never)"
+    step "Building Docker images"
     build_images
+
+    step "Pushing images to OpenShift internal registry"
+
+    # Expose the internal registry route if not already exposed
+    oc get route default-route -n openshift-image-registry &>/dev/null || \
+      oc patch configs.imageregistry.operator.openshift.io/cluster \
+        --patch '{"spec":{"defaultRoute":true}}' --type=merge
+
+    REGISTRY=$(oc get route default-route -n openshift-image-registry \
+      -o jsonpath='{.spec.host}' 2>/dev/null)
+    if [[ -z "$REGISTRY" ]]; then
+      fail "Could not determine the OpenShift image registry route."
+      echo "    Run: oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{\"spec\":{\"defaultRoute\":true}}' --type=merge"
+      exit 1
+    fi
+
+    echo "    Registry: $REGISTRY"
+    docker login -u "$(oc whoami)" -p "$(oc whoami -t)" "$REGISTRY"
+
+    for name in demo-frontend demo-gateway demo-order-service demo-payment-service demo-inventory-service; do
+      printf "    Pushing %s..." "$name"
+      docker tag "${name}:local" "${REGISTRY}/elastic-apm-demo/${name}:latest"
+      docker push "${REGISTRY}/elastic-apm-demo/${name}:latest" -q
+      echo -e " ${GREEN}done${NC}"
+    done
+
+    step "Creating demo-secrets from .env"
+    oc create secret generic demo-secrets \
+      --from-literal=ELASTIC_APM_SERVER_URL="${ELASTIC_APM_SERVER_URL}" \
+      --from-literal=ELASTIC_API_KEY="${ELASTIC_API_KEY}" \
+      --from-literal=NEXT_PUBLIC_ELASTIC_APM_SERVER_URL="${NEXT_PUBLIC_ELASTIC_APM_SERVER_URL:-$ELASTIC_APM_SERVER_URL}" \
+      -n elastic-apm-demo \
+      --dry-run=client -o yaml | oc apply -f -
 
     step "Applying OpenShift manifests"
     oc apply -f deployment/openshift/
@@ -213,9 +246,17 @@ echo -e "${GREEN}============================================================${N
 echo -e "${GREEN}  Demo is running!${NC}"
 echo -e "${GREEN}============================================================${NC}"
 echo ""
-echo "  Frontend:          http://localhost:3000"
-echo "  Gateway API:       http://localhost:4000"
-echo "  OTel Collector:    http://localhost:13133  (health check)"
+
+if [[ "$MODE" == "openshift" ]]; then
+  FRONTEND_URL=$(oc get route frontend -n elastic-apm-demo -o jsonpath='{.spec.host}' 2>/dev/null || echo "check: oc get route -n elastic-apm-demo")
+  GATEWAY_URL=$(oc get route gateway   -n elastic-apm-demo -o jsonpath='{.spec.host}' 2>/dev/null || echo "check: oc get route -n elastic-apm-demo")
+  echo "  Frontend:    https://$FRONTEND_URL"
+  echo "  Gateway API: https://$GATEWAY_URL"
+else
+  echo "  Frontend:          http://localhost:3000"
+  echo "  Gateway API:       http://localhost:4000"
+  echo "  OTel Collector:    http://localhost:13133  (health check)"
+fi
 echo ""
 echo "  APM Server:        $ELASTIC_APM_SERVER_URL"
 echo ""

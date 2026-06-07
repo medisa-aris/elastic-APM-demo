@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: order-service
-          image: demo-order-service:local
-          imagePullPolicy: Never
+          image: image-registry.openshift-image-registry.svc:5000/elastic-apm-demo/demo-order-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           envFrom:
