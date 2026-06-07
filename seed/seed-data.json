@@ -1,0 +1,44 @@
+{
+  "inventory": [
+    {
+      "sku": "LAPTOP-PRO-15",
+      "name": "Laptop Pro 15\"",
+      "description": "High-performance 15-inch laptop with 16GB RAM and 512GB SSD",
+      "price": 1299.99,
+      "quantity": 50,
+      "reserved": 0
+    },
+    {
+      "sku": "WIRELESS-MOUSE",
+      "name": "Wireless Ergonomic Mouse",
+      "description": "Comfortable ergonomic wireless mouse with 12-month battery life",
+      "price": 39.99,
+      "quantity": 200,
+      "reserved": 0
+    },
+    {
+      "sku": "USB-C-HUB",
+      "name": "USB-C Hub 7-in-1",
+      "description": "7-port USB-C hub with HDMI, USB-A, SD card reader and 100W PD",
+      "price": 59.99,
+      "quantity": 150,
+      "reserved": 0
+    },
+    {
+      "sku": "MECH-KEYBOARD",
+      "name": "Mechanical Keyboard TKL",
+      "description": "Tenkeyless mechanical keyboard with Cherry MX switches",
+      "price": 129.99,
+      "quantity": 75,
+      "reserved": 0
+    },
+    {
+      "sku": "MONITOR-27",
+      "name": "27\" 4K IPS Monitor",
+      "description": "27-inch 4K IPS display with USB-C connectivity and 99% sRGB coverage",
+      "price": 449.99,
+      "quantity": 30,
+      "reserved": 0
+    }
+  ]
+}

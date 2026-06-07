@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\medis\\\\Documents\\\\ANTHROPIC\\\\elastic-APM-demo\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(python -c ' *)",
+      "Bash(pip list *)",
+      "Bash(findstr -i \"pdf\")"
+    ]
+  }
+}
