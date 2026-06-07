@@ -143,9 +143,20 @@ if [[ "$RUNTIME" == "docker" ]] && $IS_CRC; then
   warn "Attempting push anyway — it may succeed if you already configured Docker."
 fi
 
+# ── RBAC: grant registry-editor to the current user in the namespace ──────────
+# Even cluster-admin users need this role explicitly for Docker push to succeed.
+step "Granting registry push permissions in '$NAMESPACE'"
+oc policy add-role-to-user registry-editor "$OC_USER" -n "$NAMESPACE" 2>/dev/null && \
+  ok "registry-editor role granted to $OC_USER" || \
+  warn "Could not grant registry-editor (may already be set or insufficient perms)"
+
 # ── Login (not needed for skopeo — it uses --dest-creds inline) ──────────────
 if [[ "$RUNTIME" != "skopeo" ]]; then
   step "Logging in to registry"
+
+  # Refresh the token after the role grant
+  OC_TOKEN=$(oc whoami -t)
+
   if [[ "$RUNTIME" == "podman" ]]; then
     podman login --tls-verify=false -u "$OC_USER" -p "$OC_TOKEN" "$REGISTRY"
   else
