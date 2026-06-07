@@ -200,29 +200,7 @@ case "$MODE" in
     build_images
 
     step "Pushing images to OpenShift internal registry"
-
-    # Expose the internal registry route if not already exposed
-    oc get route default-route -n openshift-image-registry &>/dev/null || \
-      oc patch configs.imageregistry.operator.openshift.io/cluster \
-        --patch '{"spec":{"defaultRoute":true}}' --type=merge
-
-    REGISTRY=$(oc get route default-route -n openshift-image-registry \
-      -o jsonpath='{.spec.host}' 2>/dev/null)
-    if [[ -z "$REGISTRY" ]]; then
-      fail "Could not determine the OpenShift image registry route."
-      echo "    Run: oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{\"spec\":{\"defaultRoute\":true}}' --type=merge"
-      exit 1
-    fi
-
-    echo "    Registry: $REGISTRY"
-    docker login -u "$(oc whoami)" -p "$(oc whoami -t)" "$REGISTRY"
-
-    for name in demo-frontend demo-gateway demo-order-service demo-payment-service demo-inventory-service; do
-      printf "    Pushing %s..." "$name"
-      docker tag "${name}:local" "${REGISTRY}/elastic-apm-demo/${name}:latest"
-      docker push "${REGISTRY}/elastic-apm-demo/${name}:latest" -q
-      echo -e " ${GREEN}done${NC}"
-    done
+    bash "$SCRIPT_DIR/push-images-openshift.sh" --namespace elastic-apm-demo
 
     step "Creating demo-secrets from .env"
     oc create secret generic demo-secrets \

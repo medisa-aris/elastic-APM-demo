@@ -227,37 +227,8 @@ switch ($Mode) {
         }
 
         Write-Step 'Pushing images to OpenShift internal registry'
-
-        # Expose the internal registry route if not already exposed
-        $routeCheck = & oc get route default-route -n openshift-image-registry 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            & oc patch configs.imageregistry.operator.openshift.io/cluster `
-                --patch '{"spec":{"defaultRoute":true}}' --type=merge
-            Start-Sleep -Seconds 10
-        }
-
-        $registry = & oc get route default-route -n openshift-image-registry `
-            -o jsonpath='{.spec.host}' 2>&1
-        if (-not $registry -or $LASTEXITCODE -ne 0) {
-            Write-Fail 'Could not determine the OpenShift image registry route.'
-            Write-Host "    Run: oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{`"spec`":{`"defaultRoute`":true}}' --type=merge" -ForegroundColor Yellow
-            exit 1
-        }
-        Write-Host "    Registry: $registry"
-
-        $ocToken = & oc whoami -t
-        $ocUser  = & oc whoami
-        & docker login -u $ocUser -p $ocToken $registry
-        if ($LASTEXITCODE -ne 0) { Write-Fail 'docker login to OpenShift registry failed'; exit 1 }
-
-        $names = @('demo-frontend','demo-gateway','demo-order-service','demo-payment-service','demo-inventory-service')
-        foreach ($name in $names) {
-            Write-Host "    Pushing ${name}..." -NoNewline
-            & docker tag "${name}:local" "${registry}/elastic-apm-demo/${name}:latest"
-            & docker push "${registry}/elastic-apm-demo/${name}:latest" -q
-            if ($LASTEXITCODE -ne 0) { Write-Fail "Push failed for $name"; exit 1 }
-            Write-Host ' done' -ForegroundColor Green
-        }
+        & "$PSScriptRoot\Push-Images-OpenShift.ps1" -Namespace elastic-apm-demo
+        if ($LASTEXITCODE -ne 0) { Write-Fail 'Image push failed'; exit 1 }
 
         Write-Step 'Creating demo-secrets from .env'
         $nextPublicUrl = [System.Environment]::GetEnvironmentVariable('NEXT_PUBLIC_ELASTIC_APM_SERVER_URL')
