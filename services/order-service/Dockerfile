@@ -2,8 +2,9 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
+# Cache dependency layer — only re-runs when pom.xml changes
 COPY pom.xml .
-RUN mvn dependency:go-offline -q
+RUN mvn dependency:resolve -DskipTests -q
 
 COPY src ./src
 RUN mvn package -DskipTests -q
