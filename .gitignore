@@ -21,7 +21,9 @@
 **/target/
 **/*.class
 **/*.jar
-!**/test*.jar
+**/*.war
+**/*.ear
+*.log
 
 # Go
 **/vendor/
