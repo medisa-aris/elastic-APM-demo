@@ -36,7 +36,8 @@ services:
   # ---------------------------------------------------------------------------
   inventory-service:
     build:
-      context: ./services/inventory-service
+      context: .
+      dockerfile: services/inventory-service/Dockerfile
     container_name: inventory-service
     environment:
       <<: *otel-env

@@ -124,18 +124,25 @@ fi
 
 # ── Start ─────────────────────────────────────────────────────────────────────
 build_images() {
+  # Each entry: "tag|context|optional:-f dockerfile"
   local images=(
-    "demo-frontend:local|./frontend"
-    "demo-gateway:local|./gateway"
-    "demo-order-service:local|./services/order-service"
-    "demo-payment-service:local|./services/payment-service"
-    "demo-inventory-service:local|./services/inventory-service"
+    "demo-frontend:local|./frontend|"
+    "demo-gateway:local|./gateway|"
+    "demo-order-service:local|./services/order-service|"
+    "demo-payment-service:local|./services/payment-service|"
+    "demo-inventory-service:local|.|services/inventory-service/Dockerfile"
   )
   for entry in "${images[@]}"; do
     local tag="${entry%%|*}"
-    local ctx="${entry##*|}"
+    local rest="${entry#*|}"
+    local ctx="${rest%%|*}"
+    local dfile="${rest##*|}"
     printf "    Building %s..." "$tag"
-    docker build -t "$tag" "$ctx" -q
+    if [[ -n "$dfile" ]]; then
+      docker build -t "$tag" -f "$dfile" "$ctx" -q
+    else
+      docker build -t "$tag" "$ctx" -q
+    fi
     echo -e " ${GREEN}done${NC}"
   done
 }

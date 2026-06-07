@@ -176,16 +176,20 @@ switch ($Mode) {
         Write-Step 'Building Docker images for Kubernetes (imagePullPolicy: Never)'
 
         $images = @(
-            @{ tag = 'demo-frontend:local';         ctx = './frontend' },
-            @{ tag = 'demo-gateway:local';           ctx = './gateway' },
-            @{ tag = 'demo-order-service:local';     ctx = './services/order-service' },
-            @{ tag = 'demo-payment-service:local';   ctx = './services/payment-service' },
-            @{ tag = 'demo-inventory-service:local'; ctx = './services/inventory-service' }
+            @{ tag = 'demo-frontend:local';         ctx = './frontend';                   dfile = '' },
+            @{ tag = 'demo-gateway:local';           ctx = './gateway';                    dfile = '' },
+            @{ tag = 'demo-order-service:local';     ctx = './services/order-service';     dfile = '' },
+            @{ tag = 'demo-payment-service:local';   ctx = './services/payment-service';   dfile = '' },
+            @{ tag = 'demo-inventory-service:local'; ctx = '.'; dfile = 'services/inventory-service/Dockerfile' }
         )
 
         foreach ($img in $images) {
             Write-Host "    Building $($img.tag)..." -NoNewline
-            & docker build -t $img.tag $img.ctx -q
+            if ($img.dfile) {
+                & docker build -t $img.tag -f $img.dfile $img.ctx -q
+            } else {
+                & docker build -t $img.tag $img.ctx -q
+            }
             if ($LASTEXITCODE -ne 0) { Write-Fail "Build failed for $($img.tag)"; exit 1 }
             Write-Host ' done' -ForegroundColor Green
         }
@@ -212,16 +216,20 @@ switch ($Mode) {
         Write-Step 'Building Docker images'
 
         $images = @(
-            @{ tag = 'demo-frontend:local';         ctx = './frontend' },
-            @{ tag = 'demo-gateway:local';           ctx = './gateway' },
-            @{ tag = 'demo-order-service:local';     ctx = './services/order-service' },
-            @{ tag = 'demo-payment-service:local';   ctx = './services/payment-service' },
-            @{ tag = 'demo-inventory-service:local'; ctx = './services/inventory-service' }
+            @{ tag = 'demo-frontend:local';         ctx = './frontend';                   dfile = '' },
+            @{ tag = 'demo-gateway:local';           ctx = './gateway';                    dfile = '' },
+            @{ tag = 'demo-order-service:local';     ctx = './services/order-service';     dfile = '' },
+            @{ tag = 'demo-payment-service:local';   ctx = './services/payment-service';   dfile = '' },
+            @{ tag = 'demo-inventory-service:local'; ctx = '.'; dfile = 'services/inventory-service/Dockerfile' }
         )
 
         foreach ($img in $images) {
             Write-Host "    Building $($img.tag)..." -NoNewline
-            & docker build -t $img.tag $img.ctx -q
+            if ($img.dfile) {
+                & docker build -t $img.tag -f $img.dfile $img.ctx -q
+            } else {
+                & docker build -t $img.tag $img.ctx -q
+            }
             if ($LASTEXITCODE -ne 0) { Write-Fail "Build failed for $($img.tag)"; exit 1 }
             Write-Host ' done' -ForegroundColor Green
         }
