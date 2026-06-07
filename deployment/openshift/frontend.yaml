@@ -24,6 +24,9 @@ spec:
               value: "3000"
             - name: HOSTNAME
               value: "0.0.0.0"
+            # Server-side proxy target — read at request time, not baked into image
+            - name: GATEWAY_URL
+              value: "http://gateway:4000"
           livenessProbe:
             httpGet:
               path: /

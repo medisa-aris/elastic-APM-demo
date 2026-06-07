@@ -1,7 +1,8 @@
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:4000';
-
+// Calls go to /api/* on the same origin — the Next.js proxy route
+// (src/app/api/[...path]/route.ts) forwards them to GATEWAY_URL server-side.
+// No NEXT_PUBLIC_GATEWAY_URL needed; works in every deployment without rebuilding.
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${GATEWAY_URL}${path}`, {
+  const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   });

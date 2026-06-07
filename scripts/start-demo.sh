@@ -124,9 +124,16 @@ fi
 
 # ── Start ─────────────────────────────────────────────────────────────────────
 build_images() {
-  # Each entry: "tag|context|optional:-f dockerfile"
+  # Build frontend with NEXT_PUBLIC_* vars baked in (required for Elastic RUM)
+  printf "    Building demo-frontend:local..."
+  docker build -t demo-frontend:local ./frontend -q \
+    --build-arg NEXT_PUBLIC_ELASTIC_APM_SERVER_URL="${ELASTIC_APM_SERVER_URL:-}" \
+    --build-arg NEXT_PUBLIC_ELASTIC_APM_SERVICE_NAME="${NEXT_PUBLIC_ELASTIC_APM_SERVICE_NAME:-demo-frontend}" \
+    --build-arg NEXT_PUBLIC_ELASTIC_APM_ENVIRONMENT="${ENVIRONMENT:-local}"
+  echo -e " ${GREEN}done${NC}"
+
+  # Remaining services (no special build args)
   local images=(
-    "demo-frontend:local|./frontend|"
     "demo-gateway:local|./gateway|"
     "demo-order-service:local|./services/order-service|"
     "demo-payment-service:local|./services/payment-service|"

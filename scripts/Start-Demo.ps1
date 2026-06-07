@@ -175,8 +175,18 @@ switch ($Mode) {
     'kubernetes' {
         Write-Step 'Building Docker images for Kubernetes (imagePullPolicy: Never)'
 
+        # Frontend needs NEXT_PUBLIC_* vars baked in at build time (Elastic RUM)
+        Write-Host '    Building demo-frontend:local...' -NoNewline
+        $env_val = [System.Environment]::GetEnvironmentVariable('ELASTIC_APM_SERVER_URL')
+        $svc_env  = [System.Environment]::GetEnvironmentVariable('ENVIRONMENT') ?? 'local'
+        & docker build -t 'demo-frontend:local' ./frontend -q `
+            --build-arg "NEXT_PUBLIC_ELASTIC_APM_SERVER_URL=$env_val" `
+            --build-arg 'NEXT_PUBLIC_ELASTIC_APM_SERVICE_NAME=demo-frontend' `
+            --build-arg "NEXT_PUBLIC_ELASTIC_APM_ENVIRONMENT=$svc_env"
+        if ($LASTEXITCODE -ne 0) { Write-Fail 'Build failed for demo-frontend:local'; exit 1 }
+        Write-Host ' done' -ForegroundColor Green
+
         $images = @(
-            @{ tag = 'demo-frontend:local';         ctx = './frontend';                   dfile = '' },
             @{ tag = 'demo-gateway:local';           ctx = './gateway';                    dfile = '' },
             @{ tag = 'demo-order-service:local';     ctx = './services/order-service';     dfile = '' },
             @{ tag = 'demo-payment-service:local';   ctx = './services/payment-service';   dfile = '' },
