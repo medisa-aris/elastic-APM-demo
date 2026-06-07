@@ -27,6 +27,9 @@ spec:
               value: demo-order-service
             - name: PORT
               value: "8080"
+            # Spring Boot Micrometer uses HTTP/protobuf → port 4318, not gRPC 4317
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector:4318"
           livenessProbe:
             httpGet:
               path: /actuator/health
