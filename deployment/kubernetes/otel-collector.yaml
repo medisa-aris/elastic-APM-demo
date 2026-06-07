@@ -21,7 +21,7 @@ data:
             value: kubernetes
             action: upsert
     exporters:
-      otlp/elastic:
+      otlphttp/elastic:
         endpoint: "${env:ELASTIC_APM_SERVER_URL}"
         headers:
           Authorization: "ApiKey ${env:ELASTIC_API_KEY}"
@@ -36,15 +36,15 @@ data:
         traces:
           receivers: [otlp]
           processors: [resource, batch]
-          exporters: [otlp/elastic]
+          exporters: [otlphttp/elastic]
         metrics:
           receivers: [otlp]
           processors: [resource, batch]
-          exporters: [otlp/elastic]
+          exporters: [otlphttp/elastic]
         logs:
           receivers: [otlp]
           processors: [resource, batch]
-          exporters: [otlp/elastic]
+          exporters: [otlphttp/elastic]
 ---
 apiVersion: apps/v1
 kind: Deployment

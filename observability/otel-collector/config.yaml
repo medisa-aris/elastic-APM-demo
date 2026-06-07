@@ -17,15 +17,16 @@ processors:
         action: upsert
 
 exporters:
-  # Elastic Cloud APM Server via OTLP (native support since Elastic Stack 8.0+)
-  otlp/elastic:
+  # Elastic Cloud APM Server via OTLP HTTP (accepts full https:// URL)
+  # Use otlphttp, not otlp/grpc, so that ELASTIC_APM_SERVER_URL can be the
+  # standard https://... URL shown in the Elastic Cloud console.
+  otlphttp/elastic:
     endpoint: "${env:ELASTIC_APM_SERVER_URL}"
     headers:
       Authorization: "ApiKey ${env:ELASTIC_API_KEY}"
     tls:
       insecure: false
 
-  # Debug output — helpful during initial setup
   debug:
     verbosity: basic
 
@@ -41,12 +42,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [resource, batch]
-      exporters: [otlp/elastic]
+      exporters: [otlphttp/elastic]
     metrics:
       receivers: [otlp]
       processors: [resource, batch]
-      exporters: [otlp/elastic]
+      exporters: [otlphttp/elastic]
     logs:
       receivers: [otlp]
       processors: [resource, batch]
-      exporters: [otlp/elastic]
+      exporters: [otlphttp/elastic]
